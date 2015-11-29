@@ -8,6 +8,8 @@ var http = require('http');
 
 var BindingAgent = require('./lib/BindingAgent');
 
+tldjs.validHosts = ['localhost'];
+
 var proxy = http_proxy.createProxyServer({
     target: 'http://localtunnel.github.io'
 });
@@ -199,6 +201,8 @@ module.exports = function(opt) {
             var url = schema + '://' + req_id + '.' + req.headers.host;
             info.url = url;
             res.json(info);
+
+            server.emit('new_client', info);
         });
     });
 
@@ -233,6 +237,8 @@ module.exports = function(opt) {
             var url = schema + '://' + req_id + '.' + req.headers.host;
             info.url = url;
             res.json(info);
+
+            server.emit('new_client', info);
         });
 
     });
