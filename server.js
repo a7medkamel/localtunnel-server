@@ -39,18 +39,23 @@ var stats = {
 };
 
 function maybe_bounce(req, res, sock, head) {
-    // without a hostname, we won't know who the request is for
-    var hostname = req.headers.host;
-    if (!hostname) {
-        return false;
+    var client_id = req.__client_id;
+
+    if (!client_id) {
+        // without a hostname, we won't know who the request is for
+        var hostname = req.headers.host;
+        if (!hostname) {
+            return false;
+        }
+
+        var subdomain = tldjs.getSubdomain(hostname);
+        if (!subdomain) {
+            return false;
+        }
+
+        client_id = subdomain;
     }
 
-    var subdomain = tldjs.getSubdomain(hostname);
-    if (!subdomain) {
-        return false;
-    }
-
-    var client_id = subdomain;
     var client = clients[client_id];
 
     // no such subdomain
@@ -134,6 +139,11 @@ function maybe_bounce(req, res, sock, head) {
         };
 
         var client_req = http.request(opt, function(client_res) {
+            for (var i=0 ; i < (client_res.rawHeaders.length-1) ; i+=2) {
+                // todo setHeader will swallow duplicates
+                res.setHeader(client_res.rawHeaders[i], client_res.rawHeaders[i+1]);
+            }
+
             client_res.pipe(res);
             on_finished(client_res, function(err) {
                 done();
@@ -147,7 +157,6 @@ function maybe_bounce(req, res, sock, head) {
 }
 
 function new_client(id, opt, cb) {
-
     // can't ask for id already is use
     // TODO check this new id again
     if (clients[id]) {
@@ -251,6 +260,16 @@ module.exports = function(opt) {
     });
 
     var server = http.createServer();
+
+    server.proxy = function(id, req, res) {
+        req.__client_id = id;
+        debug('request %s', req.url);
+        if (maybe_bounce(req, res, null, null)) {
+            return;
+        };
+
+        app(req, res);
+    }
 
     server.on('request', function(req, res) {
         debug('request %s', req.url);
