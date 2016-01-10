@@ -139,11 +139,9 @@ function maybe_bounce(req, res, sock, head) {
         };
 
         var client_req = http.request(opt, function(client_res) {
-            for (var i=0 ; i < (client_res.rawHeaders.length-1) ; i+=2) {
-                // todo setHeader will swallow duplicates
-                res.setHeader(client_res.rawHeaders[i], client_res.rawHeaders[i+1]);
-            }
-
+            // write response code and headers
+            res.writeHead(client_res.statusCode, client_res.headers);
+            
             client_res.pipe(res);
             on_finished(client_res, function(err) {
                 done();
