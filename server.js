@@ -43,9 +43,9 @@ const stats = {
 // handle proxying a request to a client
 // will wait for a tunnel socket to become available
 function maybe_bounce(req, res, sock, head) {
-    var client_id = req.__client_id;
+    let client = clients[req.__client_id];
 
-    if (!client_id) {
+    if (!client) {
         // without a hostname, we won't know who the request is for
         const hostname = req.headers.host;
         if (!hostname) {
@@ -56,23 +56,25 @@ function maybe_bounce(req, res, sock, head) {
         if (!subdomain) {
             return false;
         }
+
+        client = clients[subdomain];
+        
+        // no such subdomain
+        // we use 502 error to the client to signify we can't service the request
+        if (!client) {
+            if (res) {
+                res.statusCode = 502;
+                res.end(`no active client for '${subdomain}'`);
+                req.connection.destroy();
+            }
+            else if (sock) {
+                sock.destroy();
+            }
+
+            return true;
+        }
     }
 
-    var client = clients[client_id];
-    // no such subdomain
-    // we use 502 error to the client to signify we can't service the request
-    if (!client) {
-        if (res) {
-            res.statusCode = 502;
-            res.end(`no active client for '${subdomain}'`);
-            req.connection.destroy();
-        }
-        else if (sock) {
-            sock.destroy();
-        }
-
-        return true;
-    }
 
     let finished = false;
     if (sock) {
